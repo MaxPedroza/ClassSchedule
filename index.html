@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8fc">
+  <title>ClassSchedule | Painel secretarial</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" data-page="inicio" aria-label="ClassSchedule, início">
+        <span class="brand-mark">C</span>
+        <span>Class<span class="brand-light">Schedule</span><small>PAINEL SECRETARIAL</small></span>
+      </a>
+      <p class="nav-caption">MENU PRINCIPAL</p>
+      <nav class="navigation" aria-label="Menu principal">
+        <button class="nav-link active" data-page="inicio"><span class="nav-icon">⌂</span>Visão geral</button>
+        <button class="nav-link" data-page="alunos"><span class="nav-icon">♙</span>Alunos</button>
+        <button class="nav-link" data-page="professores"><span class="nav-icon">♧</span>Professores</button>
+        <button class="nav-link" data-page="agenda"><span class="nav-icon">▦</span>Agenda</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="storage-note"><span class="status-dot"></span><span><strong>Modo local</strong><small>Dados salvos neste navegador</small></span></div>
+        <button class="nav-link" id="export-data"><span class="nav-icon">⇩</span>Exportar dados</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
+        <div class="breadcrumb">ClassSchedule <span>/</span> <strong id="current-section">Visão geral</strong></div>
+        <div class="topbar-right"><span class="today-label" id="today-label"></span><span class="avatar">CS</span></div>
+      </header>
+      <div class="page-content" id="page-content" tabindex="-1"></div>
+      <footer class="footer">ClassSchedule <span>·</span> Gestão simples, aulas organizadas.</footer>
+    </main>
+  </div>
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  <dialog id="record-dialog" class="record-dialog">
+    <form id="record-form" method="dialog">
+      <div class="dialog-heading">
+        <div><p class="eyebrow" id="dialog-eyebrow">CADASTRO</p><h2 id="dialog-title">Novo registro</h2></div>
+        <button type="button" class="icon-button" id="dialog-close" aria-label="Fechar">×</button>
+      </div>
+      <div id="dialog-fields" class="dialog-fields"></div>
+      <p class="form-error" id="form-error" role="alert"></p>
+      <div class="dialog-actions"><button type="button" class="button button-quiet" id="dialog-cancel">Cancelar</button><button type="submit" class="button button-primary">Salvar</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
