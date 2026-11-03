@@ -6,9 +6,33 @@
   <meta name="theme-color" content="#f7f8fc">
   <title>ClassSchedule | Painel secretarial</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
+  <main class="auth-screen" id="auth-screen">
+    <section class="auth-card">
+      <a class="brand auth-brand" href="#" aria-label="ClassSchedule">
+        <span class="brand-mark">C</span>
+        <span>Class<span class="brand-light">Schedule</span><small>PAINEL SECRETARIAL</small></span>
+      </a>
+      <p class="eyebrow">SEU ESPAÇO DE GESTÃO</p>
+      <h1 id="auth-title">Entre na sua conta</h1>
+      <p class="auth-description">Acesse sua agenda e seus cadastros com segurança.</p>
+      <div class="auth-config-warning" id="auth-config-warning" hidden>
+        <strong>Falta conectar um projeto Firebase.</strong>
+        <span>Crie um projeto no Firebase Console, copie o arquivo .env.example para .env.local e preencha as credenciais do app Web. Veja o passo a passo no README.</span>
+      </div>
+      <form id="auth-form">
+        <label class="form-field" for="auth-email">E-mail<input class="field" id="auth-email" name="email" type="email" autocomplete="email" required></label>
+        <label class="form-field" for="auth-password">Senha<input class="field" id="auth-password" name="password" type="password" minlength="6" autocomplete="current-password" required></label>
+        <p class="form-error" id="auth-error" role="alert"></p>
+        <button class="button button-primary auth-submit" id="auth-submit" type="submit">Entrar</button>
+      </form>
+      <button class="text-link auth-mode-toggle" id="auth-mode-toggle" type="button">Ainda não tem conta? Criar conta</button>
+      <p class="auth-footnote">Seus dados são armazenados com segurança no Firebase e vinculados à sua conta.</p>
+    </section>
+  </main>
+  <div id="application" hidden>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="#" data-page="inicio" aria-label="ClassSchedule, início">
@@ -23,7 +47,7 @@
         <button class="nav-link" data-page="agenda"><span class="nav-icon">▦</span>Agenda</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="storage-note"><span class="status-dot"></span><span><strong>Modo local</strong><small>Dados salvos neste navegador</small></span></div>
+        <div class="storage-note"><span class="status-dot"></span><span><strong>Firebase conectado</strong><small>Dados vinculados à sua conta</small></span></div>
         <button class="nav-link" id="export-data"><span class="nav-icon">⇩</span>Exportar dados</button>
       </div>
     </aside>
@@ -32,7 +56,7 @@
       <header class="topbar">
         <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
         <div class="breadcrumb">ClassSchedule <span>/</span> <strong id="current-section">Visão geral</strong></div>
-        <div class="topbar-right"><span class="today-label" id="today-label"></span><span class="avatar">CS</span></div>
+        <div class="topbar-right"><span class="today-label" id="today-label"></span><span class="user-email" id="user-email"></span><button class="avatar logout-button" id="sign-out" type="button" aria-label="Sair da conta" title="Sair da conta">↪</button></div>
       </header>
       <div class="page-content" id="page-content" tabindex="-1"></div>
       <footer class="footer">ClassSchedule <span>·</span> Gestão simples, aulas organizadas.</footer>
@@ -50,5 +74,6 @@
       <div class="dialog-actions"><button type="button" class="button button-quiet" id="dialog-cancel">Cancelar</button><button type="submit" class="button button-primary">Salvar</button></div>
     </form>
   </dialog>
+  </div>
 </body>
 </html>

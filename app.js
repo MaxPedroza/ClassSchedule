@@ -1,43 +1,21 @@
+import { deleteRecord as deleteCloudRecord, firebaseConfigured, loadWorkspace, saveRecord, signIn, signOutUser, signUp, subscribeWorkspace, watchAuth } from "./lib/firebase.js";
+import { validateClass, validateStudentPlan } from "./lib/scheduling.js";
+
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "classschedule.data.v1";
   const page = document.getElementById("page-content");
   const dialog = document.getElementById("record-dialog");
   const form = document.getElementById("record-form");
   const fields = document.getElementById("dialog-fields");
   const errorBox = document.getElementById("form-error");
   const sectionTitles = { inicio: "Visão geral", alunos: "Alunos", professores: "Professores", agenda: "Agenda" };
-  let state = loadState();
+  let state = { students: [], teachers: [], classes: [] };
+  let currentUser = null;
+  let unsubscribeWorkspace = null;
   let activePage = "inicio";
   let searchTerm = "";
   let formContext = null;
-
-  function loadState() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return { students: [], teachers: [], classes: [] };
-      const data = JSON.parse(saved);
-      if (!data || !Array.isArray(data.students) || !Array.isArray(data.teachers) || !Array.isArray(data.classes)) {
-        throw new Error("Formato de dados inválido.");
-      }
-      return data;
-    } catch (error) {
-      console.error("Não foi possível carregar os dados locais.", error);
-      return { students: [], teachers: [], classes: [] };
-    }
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      return true;
-    } catch (error) {
-      console.error("Não foi possível salvar os dados locais.", error);
-      notify("Não foi possível salvar. Verifique o espaço disponível no navegador.", true);
-      return false;
-    }
-  }
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>"']/g, (char) => ({
@@ -262,7 +240,7 @@
     fields.querySelector("input, select, textarea")?.focus();
   }
 
-  function saveForm(event) {
+  async function saveForm(event) {
     event.preventDefault();
     if (!formContext) return;
     errorBox.textContent = "";
@@ -270,36 +248,32 @@
     const values = Object.fromEntries(new FormData(form).entries());
     const { kind, recordId } = formContext;
     const collection = kind === "student" ? "students" : kind === "teacher" ? "teachers" : "classes";
-    if (kind === "student" && values.endDate < values.startDate) {
-      errorBox.textContent = "A data de vencimento precisa ser igual ou posterior ao início do plano.";
-      return;
-    }
-    if (kind === "class") {
-      if (values.start >= values.end) {
-        errorBox.textContent = "O horário de término precisa ser posterior ao início.";
+    if (kind === "student") {
+      const planError = validateStudentPlan(values);
+      if (planError) {
+        errorBox.textContent = planError;
         return;
       }
-      const conflict = state.classes.find((item) => {
-        if (item.id === recordId || item.date !== values.date) return false;
-        const overlaps = values.start < item.end && values.end > item.start;
-        return overlaps && (item.teacherId === values.teacherId || item.studentId === values.studentId);
-      });
-      if (conflict) {
-        const conflictingTeacher = conflict.teacherId === values.teacherId;
-        errorBox.textContent = conflictingTeacher
-          ? `Conflito: o(a) professor(a) já tem uma aula das ${conflict.start} às ${conflict.end} nessa data.`
-          : `Conflito: o aluno já tem uma aula das ${conflict.start} às ${conflict.end} nessa data.`;
+    }
+    if (kind === "class") {
+      const result = validateClass(values, state.classes, recordId);
+      if (result.error) {
+        errorBox.textContent = result.error;
         return;
       }
     }
     const records = state[collection];
-    if (recordId) {
-      const index = records.findIndex((item) => item.id === recordId);
-      if (index >= 0) records[index] = { ...records[index], ...values };
-    } else {
-      records.push({ id: id(), ...values });
+    const record = recordId
+      ? { ...byId(records, recordId), ...values }
+      : { id: id(), ...values };
+    try {
+      await saveRecord(currentUser.uid, collection, record, recordId);
+      state = await loadWorkspace(currentUser.uid);
+    } catch (error) {
+      console.error("Não foi possível salvar o registro no Firebase.", error);
+      errorBox.textContent = error.message || "Não foi possível salvar no Firebase. Tente novamente.";
+      return;
     }
-    if (!persist()) return;
     dialog.close();
     formContext = null;
     searchTerm = "";
@@ -307,7 +281,7 @@
     notify(recordId ? "Alterações salvas." : "Cadastro realizado com sucesso.");
   }
 
-  function deleteRecord(kind, recordId) {
+  async function deleteRecord(kind, recordId) {
     const collection = kind === "student" ? "students" : kind === "teacher" ? "teachers" : "classes";
     const record = byId(state[collection], recordId);
     if (!record) return;
@@ -318,13 +292,16 @@
       ? `Excluir este ${kindLabel} também removerá ${linked.length} aula(s) vinculada(s). Continuar?`
       : `Excluir este ${kindLabel}?`;
     if (!window.confirm(question)) return;
-    if (kind === "student") state.classes = state.classes.filter((item) => item.studentId !== recordId);
-    if (kind === "teacher") state.classes = state.classes.filter((item) => item.teacherId !== recordId);
-    state[collection] = state[collection].filter((item) => item.id !== recordId);
-    if (persist()) {
-      render();
-      notify(`${kindLabel[0].toUpperCase()}${kindLabel.slice(1)} excluído.`);
+    try {
+      await deleteCloudRecord(currentUser.uid, collection, recordId);
+      state = await loadWorkspace(currentUser.uid);
+    } catch (error) {
+      console.error("Não foi possível excluir o registro no Firebase.", error);
+      notify(error.message || "Não foi possível excluir no Firebase. Tente novamente.", true);
+      return;
     }
+    render();
+    notify(`${kindLabel[0].toUpperCase()}${kindLabel.slice(1)} excluído.`);
   }
 
   function exportData() {
@@ -387,5 +364,118 @@
   document.getElementById("today-label").textContent = new Intl.DateTimeFormat("pt-BR", {
     weekday: "short", day: "numeric", month: "short", year: "numeric"
   }).format(new Date());
-  render();
+  const authScreen = document.getElementById("auth-screen");
+  const application = document.getElementById("application");
+  const authForm = document.getElementById("auth-form");
+  const authError = document.getElementById("auth-error");
+  const authSubmit = document.getElementById("auth-submit");
+  let createAccount = false;
+  let authGeneration = 0;
+
+  function authErrorMessage(error) {
+    const messages = {
+      "auth/email-already-in-use": "Este e-mail já possui uma conta. Entre com sua senha.",
+      "auth/invalid-credential": "E-mail ou senha incorretos.",
+      "auth/invalid-email": "Informe um endereço de e-mail válido.",
+      "auth/network-request-failed": "Falha de conexão. Verifique a internet e tente novamente.",
+      "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente novamente.",
+      "auth/weak-password": "Escolha uma senha com pelo menos 6 caracteres."
+    };
+    return messages[error.code] || error.message || "Não foi possível autenticar. Tente novamente.";
+  }
+
+  function setAuthMode(create) {
+    createAccount = create;
+    document.getElementById("auth-title").textContent = create ? "Crie sua conta" : "Entre na sua conta";
+    authSubmit.textContent = create ? "Criar conta" : "Entrar";
+    document.getElementById("auth-mode-toggle").textContent = create
+      ? "Já tem uma conta? Entrar"
+      : "Ainda não tem conta? Criar conta";
+    document.getElementById("auth-password").autocomplete = create ? "new-password" : "current-password";
+    authError.textContent = "";
+  }
+
+  async function handleAuth(user) {
+    const generation = ++authGeneration;
+    unsubscribeWorkspace?.();
+    unsubscribeWorkspace = null;
+    if (!user) {
+      currentUser = null;
+      state = { students: [], teachers: [], classes: [] };
+      application.hidden = true;
+      authScreen.hidden = false;
+      return;
+    }
+
+    authError.textContent = "";
+    authSubmit.disabled = true;
+    try {
+      const workspace = await loadWorkspace(user.uid);
+      if (generation !== authGeneration) return;
+      currentUser = user;
+      state = workspace;
+      document.getElementById("user-email").textContent = user.email || "";
+      application.hidden = false;
+      authScreen.hidden = true;
+      render();
+      unsubscribeWorkspace = subscribeWorkspace(user.uid, (updatedWorkspace) => {
+        if (currentUser?.uid !== user.uid) return;
+        state = updatedWorkspace;
+        render();
+      }, (error) => {
+        console.error("Não foi possível sincronizar os dados do Firebase.", error);
+        notify("A sincronização com o Firebase falhou. Verifique a conexão.", true);
+      });
+    } catch (error) {
+      console.error("Não foi possível carregar os dados do Firebase.", error);
+      if (generation !== authGeneration) return;
+      currentUser = null;
+      authScreen.hidden = false;
+      authError.textContent = error.message || "Não foi possível carregar seus dados. Verifique as regras e a conexão Firebase.";
+      try {
+        await signOutUser();
+      } catch (signOutError) {
+        console.error("Não foi possível encerrar a sessão após falha ao carregar os dados.", signOutError);
+        authError.textContent += " Também não foi possível encerrar a sessão; recarregue a página.";
+      }
+    } finally {
+      authSubmit.disabled = !firebaseConfigured;
+    }
+  }
+
+  document.getElementById("auth-mode-toggle").addEventListener("click", () => setAuthMode(!createAccount));
+  authForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!firebaseConfigured) return;
+    authError.textContent = "";
+    authSubmit.disabled = true;
+    const values = Object.fromEntries(new FormData(authForm).entries());
+    try {
+      if (createAccount) await signUp(values.email, values.password);
+      else await signIn(values.email, values.password);
+    } catch (error) {
+      console.error("Falha na autenticação Firebase.", error);
+      authError.textContent = authErrorMessage(error);
+      authSubmit.disabled = false;
+    }
+  });
+  document.getElementById("sign-out").addEventListener("click", async () => {
+    try {
+      await signOutUser();
+    } catch (error) {
+      console.error("Não foi possível encerrar a sessão Firebase.", error);
+      notify(error.message || "Não foi possível sair da conta.", true);
+    }
+  });
+
+  if (!firebaseConfigured) {
+    document.getElementById("auth-config-warning").hidden = false;
+    authSubmit.disabled = true;
+    document.getElementById("auth-mode-toggle").disabled = true;
+    authError.textContent = "Configure as credenciais do Firebase para entrar ou criar uma conta.";
+  } else {
+    watchAuth((user) => {
+      void handleAuth(user);
+    });
+  }
 })();
