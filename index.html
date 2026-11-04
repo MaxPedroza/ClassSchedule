@@ -42,12 +42,12 @@
       <p class="nav-caption">MENU PRINCIPAL</p>
       <nav class="navigation" aria-label="Menu principal">
         <button class="nav-link active" data-page="inicio"><span class="nav-icon">⌂</span>Visão geral</button>
-        <button class="nav-link" data-page="alunos"><span class="nav-icon">♙</span>Alunos</button>
-        <button class="nav-link" data-page="professores"><span class="nav-icon">♧</span>Professores</button>
+        <button class="nav-link" data-page="alunos" data-role="manager"><span class="nav-icon">♙</span>Alunos</button>
+        <button class="nav-link" data-page="professores" data-role="manager"><span class="nav-icon">♧</span>Professores</button>
         <button class="nav-link" data-page="agenda"><span class="nav-icon">▦</span>Agenda</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="storage-note"><span class="status-dot"></span><span><strong>Firebase conectado</strong><small>Dados vinculados à sua conta</small></span></div>
+        <div class="storage-note"><span class="status-dot"></span><span><strong id="role-label">Firebase conectado</strong><small id="workspace-label">Dados vinculados à sua conta</small></span></div>
         <button class="nav-link" id="export-data"><span class="nav-icon">⇩</span>Exportar dados</button>
       </div>
     </aside>
